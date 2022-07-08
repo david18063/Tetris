@@ -1,0 +1,2036 @@
+# include "utility.h"
+
+const int Y = 18;
+const int X = 32;
+
+char MainArray[Y][X] =
+{
+    "B HOLD B               B NEXT B", /// 0
+    "BBBBBBBB               BBBBBBBB", /// 1
+    "B      B               B      B", /// 2
+    "B      B               B      B", /// 3
+    "B      B               B      B", /// 4
+    "B      B               B      B", /// 5
+    "BBBBBBBB               BBBBBBBB", /// 6
+    "       B               B       ", /// 7
+    "       B               B       ", /// 8
+    "       B               B       ", /// 9
+    "       B               B       ", /// 10
+    "       B               B       ", /// 11
+    "       B               B       ", /// 12
+    "       B               B       ", /// 13
+    "       B               B       ", /// 14
+    "       BBBBBBBBBBBBBBBBB       ", /// 15
+    "       B SCORE:        B       ", /// 16
+    "       BBBBBBBBBBBBBBBBB       "  /// 17
+};
+///  0123456789012345678901234567890
+///            |         |         |
+///            10        20        30
+
+/// Main Box - [0][8]  --> [14][22] i -> from 0 to 14, j -> from 8 to 22
+/// Hold Box - [2][1]  --> [5][6] i -> from 2 to 5, j -> from 1 to 6
+/// Next Box - [2][24] --> [5][29] i -> from 2 to 5, j -> from 24 to 29
+/// Score Box - [16][16] --> [16][21] i -> 16, j -> from 16 to 21
+
+/// Tetrominoes
+
+/// 1 -> O Color 14, Projection Color 238
+/// 2 -> I Color 11, Projection Color 443
+/// 3 -> S Color 10, Projection Color 426
+/// 4 -> Z Color 12, Projection Color 460
+/// 5 -> L Color 6, Projection Color 358
+/// 6 -> J Color 9, Projection Color 17
+/// 7 -> T Color 13, Projection Color 477
+
+
+int ColorArray[Y][X] = {};
+char ProjectionArray[Y][X];
+
+bool stopgame = false;
+
+bool IsSpacePressed = false;
+bool IsUpPressed = false;
+bool IsShiftPressed = false;
+bool IsTetrominoSwappedOnce = false;
+bool falling = true;
+int fall_delay = 0;
+
+int CurrentTetromino = 0;
+int NextTetromino = 0;
+int HoldTetromino = 0;
+int Rotation = 1;
+int Score = 0;
+int Level = 1;
+int Difficulty = 20;
+
+int getFirstActiveBlockYCoordinateInMainArray()
+{
+    for(int i=0;i<Y;i++) for(int j=0;j<X;j++) if(MainArray[i][j] == 'A') return i;
+}
+
+int getLastActiveBlockYCoordinateInMainArray()
+{
+    for(int i=Y;i>=0;i--) for(int j=X;j>=0;j--) if(MainArray[i][j] == 'A') return i;
+}
+
+int getFirstActiveBlockXCoordinateInMainArray()
+{
+    for(int i=0;i<Y;i++) for(int j=0;j<X;j++) if(MainArray[i][j] == 'A') return j;
+}
+
+int getFirstActiveBlockYCoordinateInProjectionArray()
+{
+    for(int i=0;i<Y;i++) for(int j=0;j<X;j++) if(ProjectionArray[i][j] == 'A') return i;
+}
+
+int getFirstActiveBlockXCoordinateInProjectionArray()
+{
+    for(int i=0;i<Y;i++) for(int j=0;j<X;j++) if(ProjectionArray[i][j] == 'A') return j;
+}
+
+void FillColorArray()
+{
+    for(int i=0;i<Y;i++)
+    {
+        for(int j=0;j<X;j++)
+        {
+            if(MainArray[i][j] == 'B') ColorArray[i][j] = 14;
+            else if(MainArray[i][j] == 'A' or (MainArray[i][j] == 'S' and i < 15)) ColorArray[i][j] = 13;
+            else ColorArray[i][j] = 12;
+        }
+    }
+}
+
+void FillProjectionArray()
+{
+    for(int i=0;i<Y;i++) for(int j=0;j<X;j++) ProjectionArray[i][j] = MainArray[i][j];
+}
+
+void ClearActiveBlocksInMainArray()
+{
+    for(int i=0;i<=14;i++) for(int j=8;j<=22;j++) if(MainArray[i][j] == 'A') MainArray[i][j] = ' ';
+}
+
+void ClearActiveBlocksInProjectionArray()
+{
+    for(int i=0;i<=14;i++) for(int j=8;j<=22;j++) if(ProjectionArray[i][j] == 'A') ProjectionArray[i][j] = ' ';
+}
+
+void ClearProjection()
+{
+    for(int i=0;i<=14;i++) for(int j=8;j<=22;j++) if(MainArray[i][j] == ' ' and ColorArray[i][j] != 12) ColorArray[i][j] = 12;
+}
+
+void LightTheProjection()
+{
+    if(getFirstActiveBlockYCoordinateInProjectionArray() - getLastActiveBlockYCoordinateInMainArray() > 1)
+    {
+        for(int i=0;i<=14;i++)
+        {
+            for(int j=8;j<=22;j++)
+            {
+                if(ProjectionArray[i][j] == 'A')
+                {
+                    switch(CurrentTetromino)
+                    {
+                        /// O
+                        case 1:
+                        {
+                            ColorArray[i][j] = 238;
+
+                            break;
+                        }
+
+                        /// I
+                        case 2:
+                        {
+                            ColorArray[i][j] = 443;
+
+                            break;
+                        }
+
+                        /// S
+                        case 3:
+                        {
+                            ColorArray[i][j] = 426;
+
+                            break;
+                        }
+
+                        /// Z
+                        case 4:
+                        {
+                            ColorArray[i][j] = 460;
+
+                            break;
+                        }
+
+                        /// L
+                        case 5:
+                        {
+                            ColorArray[i][j] = 358;
+
+                            break;
+                        }
+
+                        /// J
+                        case 6:
+                        {
+                            ColorArray[i][j] = 17;
+
+                            break;
+                        }
+
+                        /// T
+                        case 7:
+                        {
+                            ColorArray[i][j] = 477;
+
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void PrintMainArray()
+{
+    for(int i=0;i<Y;i++)
+    {
+        for(int j=0;j<X;j++)
+        {
+            if(MainArray[i][j] == 'B') cout<<TextAttr(ColorArray[i][j])<<char(219); // 219
+            else if(MainArray[i][j] == 'A' or (MainArray[i][j] == 'S' and i < 15)) cout<<TextAttr(ColorArray[i][j])<<char(254); // 219
+            else if(MainArray[i][j] == ' ') cout<<TextAttr(ColorArray[i][j])<<MainArray[i][j];
+            else cout<<TextAttr(ColorArray[i][j])<<MainArray[i][j];
+        }
+
+        cout<<endl;
+    }
+}
+
+void PrintProjectionArray()
+{
+    for(int i=0;i<Y;i++)
+    {
+        for(int j=0;j<X;j++)
+        {
+            if(ProjectionArray[i][j] == 'B') cout<<char(219); // 219
+            else if(ProjectionArray[i][j] == 'A' or (ProjectionArray[i][j] == 'S' and i < 15)) cout<<char(254); // 219
+            else if(ProjectionArray[i][j] == ' ') cout<<ProjectionArray[i][j];
+            else cout<<ProjectionArray[i][j];
+        }
+
+        cout<<endl;
+    }
+}
+
+void PrintColorArray()
+{
+    for(int i=0;i<Y;i++)
+    {
+        for(int j=0;j<X;j++) cout<<ColorArray[i][j];
+
+        cout<<endl;
+    }
+}
+
+void DrawTetrominoInNextBox(int tetromino)
+{
+    switch(tetromino)
+    {
+        /// O
+        case 1:
+        {
+            MainArray[3][26] = 'S';
+            MainArray[3][27] = 'S';
+            MainArray[4][26] = 'S';
+            MainArray[4][27] = 'S';
+
+            ColorArray[3][26] = 14;
+            ColorArray[3][27] = 14;
+            ColorArray[4][26] = 14;
+            ColorArray[4][27] = 14;
+
+            break;
+        }
+
+        /// I
+        case 2:
+        {
+            MainArray[2][26] = 'S';
+            MainArray[3][26] = 'S';
+            MainArray[4][26] = 'S';
+            MainArray[5][26] = 'S';
+
+            ColorArray[2][26] = 11;
+            ColorArray[3][26] = 11;
+            ColorArray[4][26] = 11;
+            ColorArray[5][26] = 11;
+
+            break;
+        }
+
+        /// S
+        case 3:
+        {
+            MainArray[3][27] = 'S';
+            MainArray[3][28] = 'S';
+            MainArray[4][26] = 'S';
+            MainArray[4][27] = 'S';
+
+            ColorArray[3][27] = 10;
+            ColorArray[3][28] = 10;
+            ColorArray[4][26] = 10;
+            ColorArray[4][27] = 10;
+
+            break;
+        }
+
+        /// Z
+        case 4:
+        {
+            MainArray[3][25] = 'S';
+            MainArray[3][26] = 'S';
+            MainArray[4][26] = 'S';
+            MainArray[4][27] = 'S';
+
+            ColorArray[3][25] = 12;
+            ColorArray[3][26] = 12;
+            ColorArray[4][26] = 12;
+            ColorArray[4][27] = 12;
+
+            break;
+        }
+
+        /// L
+        case 5:
+        {
+            MainArray[2][26] = 'S';
+            MainArray[3][26] = 'S';
+            MainArray[4][26] = 'S';
+            MainArray[4][27] = 'S';
+
+            ColorArray[2][26] = 6;
+            ColorArray[3][26] = 6;
+            ColorArray[4][26] = 6;
+            ColorArray[4][27] = 6;
+
+            break;
+        }
+
+        /// J
+        case 6:
+        {
+            MainArray[2][27] = 'S';
+            MainArray[3][27] = 'S';
+            MainArray[4][27] = 'S';
+            MainArray[4][26] = 'S';
+
+            ColorArray[2][27] = 9;
+            ColorArray[3][27] = 9;
+            ColorArray[4][27] = 9;
+            ColorArray[4][26] = 9;
+
+            break;
+        }
+
+        /// T
+        case 7:
+        {
+            MainArray[3][26] = 'S';
+            MainArray[3][27] = 'S';
+            MainArray[3][28] = 'S';
+            MainArray[4][27] = 'S';
+
+            ColorArray[3][26] = 13;
+            ColorArray[3][27] = 13;
+            ColorArray[3][28] = 13;
+            ColorArray[4][27] = 13;
+
+            break;
+        }
+    }
+}
+
+void DrawTetrominoInHoldBox(int tetromino)
+{
+    switch(tetromino)
+    {
+        /// O
+        case 1:
+        {
+            MainArray[3][3] = 'S';
+            MainArray[3][4] = 'S';
+            MainArray[4][3] = 'S';
+            MainArray[4][4] = 'S';
+
+            ColorArray[3][3] = 14;
+            ColorArray[3][4] = 14;
+            ColorArray[4][3] = 14;
+            ColorArray[4][4] = 14;
+
+            break;
+        }
+
+        /// I
+        case 2:
+        {
+            MainArray[2][3] = 'S';
+            MainArray[3][3] = 'S';
+            MainArray[4][3] = 'S';
+            MainArray[5][3] = 'S';
+
+            ColorArray[2][3] = 11;
+            ColorArray[3][3] = 11;
+            ColorArray[4][3] = 11;
+            ColorArray[5][3] = 11;
+
+            break;
+        }
+
+        /// S
+        case 3:
+        {
+            MainArray[3][4] = 'S';
+            MainArray[3][5] = 'S';
+            MainArray[4][3] = 'S';
+            MainArray[4][4] = 'S';
+
+            ColorArray[3][4] = 10;
+            ColorArray[3][5] = 10;
+            ColorArray[4][3] = 10;
+            ColorArray[4][4] = 10;
+
+            break;
+        }
+
+        /// Z
+        case 4:
+        {
+            MainArray[3][2] = 'S';
+            MainArray[3][3] = 'S';
+            MainArray[4][3] = 'S';
+            MainArray[4][4] = 'S';
+
+            ColorArray[3][2] = 12;
+            ColorArray[3][3] = 12;
+            ColorArray[4][3] = 12;
+            ColorArray[4][4] = 12;
+
+            break;
+        }
+
+        /// L
+        case 5:
+        {
+            MainArray[2][3] = 'S';
+            MainArray[3][3] = 'S';
+            MainArray[4][3] = 'S';
+            MainArray[4][4] = 'S';
+
+            ColorArray[2][3] = 6;
+            ColorArray[3][3] = 6;
+            ColorArray[4][3] = 6;
+            ColorArray[4][4] = 6;
+
+            break;
+        }
+
+        /// J
+        case 6:
+        {
+            MainArray[2][4] = 'S';
+            MainArray[3][4] = 'S';
+            MainArray[4][4] = 'S';
+            MainArray[4][3] = 'S';
+
+            ColorArray[2][4] = 9;
+            ColorArray[3][4] = 9;
+            ColorArray[4][4] = 9;
+            ColorArray[4][3] = 9;
+
+            break;
+        }
+
+        /// T
+        case 7:
+        {
+            MainArray[3][3] = 'S';
+            MainArray[3][4] = 'S';
+            MainArray[3][5] = 'S';
+            MainArray[4][4] = 'S';
+
+            ColorArray[3][3] = 13;
+            ColorArray[3][4] = 13;
+            ColorArray[3][5] = 13;
+            ColorArray[4][4] = 13;
+
+            break;
+        }
+    }
+}
+
+void ClearTetrominoInNextBox()
+{
+    for(int i=2;i<6;i++) for(int j=24;j<30;j++) if(MainArray[i][j] == 'S') MainArray[i][j] = ' ';
+}
+
+void ClearTetrominoInHoldBox()
+{
+    for(int i=2;i<6;i++) for(int j=1;j<7;j++) if(MainArray[i][j] == 'S') MainArray[i][j] = ' ';
+}
+
+bool IsCanMoveLeftInMainArray()
+{
+    int u = getFirstActiveBlockYCoordinateInMainArray();
+    int v = getFirstActiveBlockXCoordinateInMainArray();
+
+    if(Rotation == 1)
+    {
+        switch(CurrentTetromino)
+        {
+            /// O
+            case 1:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ';
+            }
+
+            /// I
+            case 2:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+2][v-1] == ' ' and MainArray[u+3][v-1] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-2] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+2][v-1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+2][v-2] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 2)
+    {
+        switch(CurrentTetromino)
+        {
+            /// I
+            case 2:
+            {
+                return MainArray[u][v-1] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                 return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+2][v] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-2] == ' ' and MainArray[u+2][v-2] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-2] == ' ' and MainArray[u+2][v-1] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 3)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v] == ' ' and MainArray[u+2][v] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+2][v-1] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-2] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 4)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-3] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v+1] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+2][v-1] == ' ';
+            }
+        }
+    }
+}
+
+bool IsCanMoveRightInMainArray()
+{
+    int u = getFirstActiveBlockYCoordinateInMainArray();
+    int v = getFirstActiveBlockXCoordinateInMainArray();
+
+    if(Rotation == 1)
+    {
+        switch(CurrentTetromino)
+        {
+            /// O
+            case 1:
+            {
+                return MainArray[u][v+2] == ' ' and MainArray[u+1][v+2] == ' ';
+            }
+
+            /// I
+            case 2:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+1] == ' ' and MainArray[u+3][v+1] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return MainArray[u][v+2] == ' ' and MainArray[u+1][v+1] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return MainArray[u][v+2] == ' ' and MainArray[u+1][v+3] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+2] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v+3] == ' ' and MainArray[u+1][v+2] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 2)
+    {
+        switch(CurrentTetromino)
+        {
+            /// I
+            case 2:
+            {
+                return MainArray[u][v+4] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return MainArray[u+1][v+2] == ' ' and MainArray[u+2][v+2] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return MainArray[u][v+3] == ' ' and MainArray[u+1][v+1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+3] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 3)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return MainArray[u][v+2] == ' ' and MainArray[u+1][v+2] == ' ' and MainArray[u+2][v+2] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v+2] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+2] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 4)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u][v+3] == ' ' and MainArray[u+1][v+3] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u][v+1] == ' ' and MainArray[u+1][v+2] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+        }
+    }
+}
+
+bool IsCanMoveDownInMainArray()
+{
+    int u = getFirstActiveBlockYCoordinateInMainArray();
+    int v = getFirstActiveBlockXCoordinateInMainArray();
+
+    if(Rotation == 1)
+    {
+        switch(CurrentTetromino)
+        {
+            /// O
+            case 1:
+            {
+                return MainArray[u+2][v] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+
+            /// I
+            case 2:
+            {
+                return MainArray[u+4][v] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return MainArray[u+2][v-1] == ' ' and MainArray[u+2][v] == ' ' and MainArray[u+1][v+1] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return MainArray[u+1][v] == ' ' and MainArray[u+2][v+1] == ' ' and MainArray[u+2][v+2] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return MainArray[u+3][v] == ' ' and MainArray[u+3][v+1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u+3][v-1] == ' ' and MainArray[u+3][v] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u+1][v] == ' ' and MainArray[u+2][v+1] == ' ' and MainArray[u+1][v+2] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 2)
+    {
+        switch(CurrentTetromino)
+        {
+            /// I
+            case 2:
+            {
+                return MainArray[u+1][v] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+1][v+2] == ' ' and MainArray[u+1][v+3] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return MainArray[u+2][v] == ' ' and MainArray[u+3][v+1] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return MainArray[u+2][v] == ' ' and MainArray[u+3][v-1] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return MainArray[u+2][v] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+1][v+2] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u+2][v] == ' ' and MainArray[u+2][v+1] == ' ' and MainArray[u+2][v+2] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u+2][v-1] == ' ' and MainArray[u+3][v] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 3)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return MainArray[u+1][v] == ' ' and MainArray[u+3][v+1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u+1][v+1] == ' ' and MainArray[u+3][v] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u+2][v-1] == ' ' and MainArray[u+2][v] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 4)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return MainArray[u+2][v-2] == ' ' and MainArray[u+2][v-1] == ' ' and MainArray[u+2][v] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return MainArray[u+1][v] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+2] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return MainArray[u+3][v] == ' ' and MainArray[u+2][v+1] == ' ';
+            }
+        }
+    }
+}
+
+bool IsCanMoveDownInProjectionArray()
+{
+    int u = getFirstActiveBlockYCoordinateInProjectionArray();
+    int v = getFirstActiveBlockXCoordinateInProjectionArray();
+
+    if(Rotation == 1)
+    {
+        switch(CurrentTetromino)
+        {
+            /// O
+            case 1:
+            {
+                return ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+2][v+1] == ' ';
+            }
+
+            /// I
+            case 2:
+            {
+                return ProjectionArray[u+4][v] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return ProjectionArray[u+2][v-1] == ' ' and ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+1][v+1] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return ProjectionArray[u+1][v] == ' ' and ProjectionArray[u+2][v+1] == ' ' and ProjectionArray[u+2][v+2] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return ProjectionArray[u+3][v] == ' ' and ProjectionArray[u+3][v+1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return ProjectionArray[u+3][v-1] == ' ' and ProjectionArray[u+3][v] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return ProjectionArray[u+1][v] == ' ' and ProjectionArray[u+2][v+1] == ' ' and ProjectionArray[u+1][v+2] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 2)
+    {
+        switch(CurrentTetromino)
+        {
+            /// I
+            case 2:
+            {
+                return ProjectionArray[u+1][v] == ' ' and ProjectionArray[u+1][v+1] == ' ' and ProjectionArray[u+1][v+2] == ' ' and ProjectionArray[u+1][v+3] == ' ';
+            }
+
+            /// S
+            case 3:
+            {
+                return ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+3][v+1] == ' ';
+            }
+
+            /// Z
+            case 4:
+            {
+                return ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+3][v-1] == ' ';
+            }
+
+            /// L
+            case 5:
+            {
+                return ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+1][v+1] == ' ' and ProjectionArray[u+1][v+2] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+2][v+1] == ' ' and ProjectionArray[u+2][v+2] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return ProjectionArray[u+2][v-1] == ' ' and ProjectionArray[u+3][v] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 3)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return ProjectionArray[u+1][v] == ' ' and ProjectionArray[u+3][v+1] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return ProjectionArray[u+1][v+1] == ' ' and ProjectionArray[u+3][v] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return ProjectionArray[u+2][v-1] == ' ' and ProjectionArray[u+2][v] == ' ' and ProjectionArray[u+2][v+1] == ' ';
+            }
+        }
+    }
+
+    if(Rotation == 4)
+    {
+        switch(CurrentTetromino)
+        {
+            /// L
+            case 5:
+            {
+                return ProjectionArray[u+2][v-2] == ' ' and ProjectionArray[u+2][v-1] == ' ' and ProjectionArray[u+2][v] == ' ';
+            }
+
+            /// J
+            case 6:
+            {
+                return ProjectionArray[u+1][v] == ' ' and ProjectionArray[u+1][v+1] == ' ' and ProjectionArray[u+2][v+2] == ' ';
+            }
+
+            /// T
+            case 7:
+            {
+                return ProjectionArray[u+3][v] == ' ' and ProjectionArray[u+2][v+1] == ' ';
+            }
+        }
+    }
+}
+
+void MakeActiveBlocksStaticInProjectionArray()
+{
+    for(int i=0;i<15;i++) for(int j=8;j<23;j++) if(ProjectionArray[i][j] == 'A') ProjectionArray[i][j] = 'S';
+}
+
+void MoveDownInProjectionArray()
+{
+    if(IsCanMoveDownInProjectionArray())
+    {
+        for(int i=Y;i>=0;i--)
+        {
+            for(int j=X;j>=0;j--)
+            {
+                if(ProjectionArray[i][j] == 'A')
+                {
+                    swap(ProjectionArray[i][j],ProjectionArray[i+1][j]);
+                }
+            }
+        }
+    }
+    else MakeActiveBlocksStaticInProjectionArray();
+}
+
+void PlaceDownInProjectionArray()
+{
+    while(IsCanMoveDownInProjectionArray()) MoveDownInProjectionArray();
+}
+
+void MoveLeftInMainArray()
+{
+    if(IsCanMoveLeftInMainArray())
+    {
+        for(int i=0;i<Y;i++)
+        {
+            for(int j=0;j<X;j++)
+            {
+                if(MainArray[i][j] == 'A')
+                {
+                    swap(MainArray[i][j],MainArray[i][j-1]);
+                    swap(ColorArray[i][j],ColorArray[i][j-1]);
+                }
+            }
+        }
+    }
+    ClearProjection();
+    ClearActiveBlocksInProjectionArray();
+    FillProjectionArray();
+    PlaceDownInProjectionArray();
+    LightTheProjection();
+}
+
+void MoveRightInMainArray()
+{
+    if(IsCanMoveRightInMainArray())
+    {
+        for(int i=Y;i>=0;i--)
+        {
+            for(int j=X;j>=0;j--)
+            {
+                if(MainArray[i][j] == 'A')
+                {
+                    swap(MainArray[i][j],MainArray[i][j+1]);
+                    swap(ColorArray[i][j],ColorArray[i][j+1]);
+                }
+            }
+        }
+    }
+    ClearProjection();
+    ClearActiveBlocksInProjectionArray();
+    FillProjectionArray();
+    PlaceDownInProjectionArray();
+    LightTheProjection();
+}
+
+bool AreThereActiveBlocks()
+{
+    for(int i=0;i<15;i++) for(int j=8;j<23;j++) if(MainArray[i][j] == 'A') return true;
+
+    return false;
+}
+
+void MakeActiveBlocksStaticInMainArray()
+{
+    for(int i=0;i<15;i++) for(int j=8;j<23;j++) if(MainArray[i][j] == 'A') MainArray[i][j] = 'S';
+}
+
+char ConvertIntToChar(int n)
+{
+    switch(n)
+    {
+        case 0: return '0';
+        case 1: return '1';
+        case 2: return '2';
+        case 3: return '3';
+        case 4: return '4';
+        case 5: return '5';
+        case 6: return '6';
+        case 7: return '7';
+        case 8: return '8';
+        case 9: return '9';
+
+        default: return ' ';
+    }
+}
+
+void NullScore()
+{
+    MainArray[16][16] = ' ';
+    MainArray[16][17] = ' ';
+    MainArray[16][18] = ' ';
+    MainArray[16][19] = ' ';
+    MainArray[16][20] = ' ';
+    MainArray[16][21] = '0';
+}
+
+void SetScore(int score)
+{
+    vector<int> v;
+
+    for(int i=1;i<=6-Digits(score).size();i++) v.push_back(0);
+    for(int i=0;i<Digits(score).size();i++) v.push_back(Digits(score)[i]);
+
+    MainArray[16][16] = ConvertIntToChar(v[0]);
+    MainArray[16][17] = ConvertIntToChar(v[1]);
+    MainArray[16][18] = ConvertIntToChar(v[2]);
+    MainArray[16][19] = ConvertIntToChar(v[3]);
+    MainArray[16][20] = ConvertIntToChar(v[4]);
+    MainArray[16][21] = ConvertIntToChar(v[5]);
+}
+
+void MoveDownInMainArray()
+{
+    if(IsCanMoveDownInMainArray())
+    {
+        for(int i=Y;i>=0;i--)
+        {
+            for(int j=X;j>=0;j--)
+            {
+                if(MainArray[i][j] == 'A')
+                {
+                    swap(MainArray[i][j],MainArray[i+1][j]);
+                    swap(ColorArray[i][j],ColorArray[i+1][j]);
+
+                    if(getFirstActiveBlockYCoordinateInProjectionArray() - getLastActiveBlockYCoordinateInMainArray() == 1) ClearProjection();
+                }
+            }
+        }
+    }
+    else MakeActiveBlocksStaticInMainArray();
+}
+
+void PlaceDownInMainArray()
+{
+    while(IsCanMoveDownInMainArray()) MoveDownInMainArray();
+
+    ClearProjection();
+    MakeActiveBlocksStaticInMainArray();
+    MakeActiveBlocksStaticInProjectionArray();
+}
+
+bool IsCanTetrominoBeSpawnedOnTop(int tetromino)
+{
+    switch(tetromino)
+    {
+        /// O
+        case 1:
+        {
+            return MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[0][16] == ' ' and MainArray[1][16] == ' ';
+        }
+
+        /// I
+        case 2:
+        {
+            return MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[2][15] == ' ' and MainArray[3][15] == ' ';
+        }
+
+        /// S
+        case 3:
+        {
+            return MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[0][16] == ' ' and MainArray[1][14] == ' ';
+        }
+
+        /// Z
+        case 4:
+        {
+            return MainArray[0][14] == ' ' and MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[1][16] == ' ';
+        }
+
+        /// L
+        case 5:
+        {
+            return MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[2][15] == ' ' and MainArray[2][16] == ' ';
+        }
+
+        /// J
+        case 6:
+        {
+            return MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[2][15] == ' ' and MainArray[2][14] == ' ';
+        }
+
+        /// T
+        case 7:
+        {
+            return MainArray[0][15] == ' ' and MainArray[1][15] == ' ' and MainArray[0][14] == ' ' and MainArray[0][16] == ' ';
+        }
+    }
+}
+
+void ClearBlocksInMainBox()
+{
+    for(int i=0;i<=14;i++) for(int j=8;j<=22;j++) if(MainArray[i][j] == 'A' or MainArray[i][j] == 'S') MainArray[i][j] = ' ';
+}
+
+void ClearEverything()
+{
+    ClearBlocksInMainBox();
+    ClearTetrominoInHoldBox();
+    ClearTetrominoInNextBox();
+}
+
+void TetrisSound()
+{
+    Beep(1000,100);
+    Beep(2000,1000);
+}
+
+void DestroySound()
+{
+    Beep(1000,100);
+}
+
+void GameOverSound()
+{
+    Beep(4000,100);
+    Beep(3000,100);
+    Beep(2000,700);
+}
+
+void GameOver()
+{
+    for(int i=0;i<Y;i++) for(int j=0;j<X;j++) ColorArray[i][j] = 7;
+
+    PrintMainArray();
+
+    GameOverSound();
+
+    ClearScreen();
+
+    ClearEverything();
+
+    Score = 0;
+
+    NullScore();
+
+    Level = 1;
+
+    Difficulty = 20;
+
+    FillColorArray();
+}
+
+void SpawnTetrominoOnTop(int tetromino)
+{
+    if(IsCanTetrominoBeSpawnedOnTop(tetromino))
+    {
+        Rotation = 1;
+        IsTetrominoSwappedOnce = false;
+        SetScore(Score);
+
+        switch(tetromino)
+        {
+            /// O
+            case 1:
+            {
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[0][16] = 'A';
+                MainArray[1][16] = 'A';
+
+                ColorArray[0][15] = 14;
+                ColorArray[1][15] = 14;
+                ColorArray[0][16] = 14;
+                ColorArray[1][16] = 14;
+
+                break;
+            }
+
+            /// I
+            case 2:
+            {
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[2][15] = 'A';
+                MainArray[3][15] = 'A';
+
+                ColorArray[0][15] = 11;
+                ColorArray[1][15] = 11;
+                ColorArray[2][15] = 11;
+                ColorArray[3][15] = 11;
+
+                break;
+            }
+
+            /// S
+            case 3:
+            {
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[0][16] = 'A';
+                MainArray[1][14] = 'A';
+
+                ColorArray[0][15] = 10;
+                ColorArray[1][15] = 10;
+                ColorArray[0][16] = 10;
+                ColorArray[1][14] = 10;
+
+                break;
+            }
+
+            /// Z
+            case 4:
+            {
+                MainArray[0][14] = 'A';
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[1][16] = 'A';
+
+                ColorArray[0][14] = 12;
+                ColorArray[0][15] = 12;
+                ColorArray[1][15] = 12;
+                ColorArray[1][16] = 12;
+
+                break;
+            }
+
+            /// L
+            case 5:
+            {
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[2][15] = 'A';
+                MainArray[2][16] = 'A';
+
+                ColorArray[0][15] = 6;
+                ColorArray[1][15] = 6;
+                ColorArray[2][15] = 6;
+                ColorArray[2][16] = 6;
+
+                break;
+            }
+
+            /// J
+            case 6:
+            {
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[2][15] = 'A';
+                MainArray[2][14] = 'A';
+
+                ColorArray[0][15] = 9;
+                ColorArray[1][15] = 9;
+                ColorArray[2][15] = 9;
+                ColorArray[2][14] = 9;
+
+                break;
+            }
+
+            /// T
+            case 7:
+            {
+                MainArray[0][15] = 'A';
+                MainArray[1][15] = 'A';
+                MainArray[0][14] = 'A';
+                MainArray[0][16] = 'A';
+
+                ColorArray[0][15] = 13;
+                ColorArray[1][15] = 13;
+                ColorArray[0][14] = 13;
+                ColorArray[0][16] = 13;
+
+                break;
+            }
+        }
+        ClearProjection();
+        FillProjectionArray();
+        PlaceDownInProjectionArray();
+        LightTheProjection();
+    }
+    else GameOver();
+}
+
+bool IsCanTetrominoBeRotated(int tetromino)
+{
+    int u = getFirstActiveBlockYCoordinateInMainArray();
+    int v = getFirstActiveBlockXCoordinateInMainArray();
+
+    switch(tetromino)
+    {
+        /// O
+        case 1:
+        {
+            return false;
+        }
+
+        /// I
+        case 2:
+        {
+            if(Rotation == 1) return MainArray[u][v+1] == ' ' and MainArray[u][v+2] == ' ' and MainArray[u][v+3] == ' ';
+            if(Rotation == 2) return MainArray[u+1][v] == ' ' and MainArray[u+2][v] == ' ' and MainArray[u+3][v] == ' ';
+        }
+
+        /// S
+        case 3:
+        {
+            if(Rotation == 1) return MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+1] == ' ';
+            if(Rotation == 2) return MainArray[u+1][v-1] == ' ' and MainArray[u][v+1] == ' ';
+        }
+
+        /// Z
+        case 4:
+        {
+            if(Rotation == 1) return MainArray[u+1][v] == ' ' and MainArray[u+2][v] == ' ';
+            if(Rotation == 2) return MainArray[u][v-1] == ' ' and MainArray[u+1][v+1] == ' ';
+        }
+
+        /// L
+        case 5:
+        {
+            if(Rotation == 1) return MainArray[u+1][v-1] == ' ' and MainArray[u+2][v-1] == ' ' and MainArray[u+1][v+1] == ' ';
+            if(Rotation == 2) return MainArray[u-1][v] == ' ' and MainArray[u-1][v+1] == ' ' and MainArray[u+1][v+1] == ' ';
+            if(Rotation == 3) return MainArray[u][v+2] == ' ' and MainArray[u+1][v] == ' ' and MainArray[u+1][v+2] == ' ';
+            if(Rotation == 4) return MainArray[u][v-1] == ' ' and MainArray[u+2][v-1] == ' ' and MainArray[u+2][v] == ' ';
+        }
+
+        /// J
+        case 6:
+        {
+            if(Rotation == 1) return MainArray[u][v-1] == ' ' and MainArray[u+1][v-1] == ' ' and MainArray[u+1][v+1] == ' ';
+            if(Rotation == 2) return MainArray[u][v+1] == ' ' and MainArray[u][v+2] == ' ' and MainArray[u+2][v+1] == ' ';
+            if(Rotation == 3) return MainArray[u+1][v-1] == ' ' and MainArray[u+1][v+1] == ' ' and MainArray[u+2][v+1] == ' ';
+            if(Rotation == 4) return MainArray[u-1][v+1] == ' ' and MainArray[u+1][v] == ' ' and MainArray[u+1][v+1] == ' ';
+        }
+
+        /// T
+        case 7:
+        {
+            if(Rotation == 1) return MainArray[u+1][v+2] == ' ' and MainArray[u+2][v+2] == ' ';
+            if(Rotation == 2) return MainArray[u+2][v-2] == ' ' and MainArray[u+2][v-1] == ' ';
+            if(Rotation == 3) return MainArray[u-1][v-1] == ' ' and MainArray[u][v-1] == ' ';
+            if(Rotation == 4) return MainArray[u][v+1] == ' ' and MainArray[u][v+2] == ' ';
+        }
+    }
+}
+
+void RotateTetromino(int tetromino)
+{
+    int u = getFirstActiveBlockYCoordinateInMainArray();
+    int v = getFirstActiveBlockXCoordinateInMainArray();
+
+    if(IsCanTetrominoBeRotated(tetromino))
+    {
+        switch(tetromino)
+        {
+            /// I
+            case 2:
+            {
+                if(Rotation == 1)
+                {
+                    swap(MainArray[u+1][v],MainArray[u][v+1]);
+                    swap(ColorArray[u+1][v],ColorArray[u][v+1]);
+
+                    swap(MainArray[u+2][v],MainArray[u][v+2]);
+                    swap(ColorArray[u+2][v],ColorArray[u][v+2]);
+
+                    swap(MainArray[u+3][v],MainArray[u][v+3]);
+                    swap(ColorArray[u+3][v],ColorArray[u][v+3]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 2)
+                {
+                    swap(MainArray[u+1][v],MainArray[u][v+1]);
+                    swap(ColorArray[u+1][v],ColorArray[u][v+1]);
+
+                    swap(MainArray[u+2][v],MainArray[u][v+2]);
+                    swap(ColorArray[u+2][v],ColorArray[u][v+2]);
+
+                    swap(MainArray[u+3][v],MainArray[u][v+3]);
+                    swap(ColorArray[u+3][v],ColorArray[u][v+3]);
+
+                    Rotation = 1;
+
+                    break;
+                }
+            }
+
+            /// S
+            case 3:
+            {
+                if(Rotation == 1)
+                {
+                    swap(MainArray[u+1][v-1],MainArray[u+2][v+1]);
+                    swap(ColorArray[u+1][v-1],ColorArray[u+2][v+1]);
+
+                    swap(MainArray[u][v+1],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v+1],ColorArray[u+1][v+1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 2)
+                {
+                    swap(MainArray[u+1][v-1],MainArray[u+2][v+1]);
+                    swap(ColorArray[u+1][v-1],ColorArray[u+2][v+1]);
+
+                    swap(MainArray[u][v+1],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v+1],ColorArray[u+1][v+1]);
+
+                    Rotation = 1;
+
+                    break;
+                }
+            }
+
+            /// Z
+            case 4:
+            {
+                if(Rotation == 1)
+                {
+                    swap(MainArray[u][v],MainArray[u+1][v]);
+                    swap(ColorArray[u][v],ColorArray[u+1][v]);
+
+                    swap(MainArray[u+1][v+2],MainArray[u+2][v]);
+                    swap(ColorArray[u+1][v+2],ColorArray[u+2][v]);
+
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 2)
+                {
+                    swap(MainArray[u][v-1],MainArray[u+1][v-1]);
+                    swap(ColorArray[u][v-1],ColorArray[u+1][v-1]);
+
+                    swap(MainArray[u+2][v-1],MainArray[u+1][v+1]);
+                    swap(ColorArray[u+2][v-1],ColorArray[u+1][v+1]);
+
+                    Rotation = 1;
+
+                    break;
+                }
+            }
+
+            /// L
+            case 5:
+            {
+                if(Rotation == 1)
+                {
+
+                    swap(MainArray[u][v],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v],ColorArray[u+1][v+1]);
+
+                    swap(MainArray[u+2][v],MainArray[u+1][v-1]);
+                    swap(ColorArray[u+2][v],ColorArray[u+1][v-1]);
+
+                    swap(MainArray[u+2][v+1],MainArray[u+2][v-1]);
+                    swap(ColorArray[u+2][v+1],ColorArray[u+2][v-1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 2)
+                {
+                    swap(MainArray[u+1][v],MainArray[u-1][v]);
+                    swap(ColorArray[u+1][v],ColorArray[u-1][v]);
+
+                    swap(MainArray[u][v],MainArray[u-1][v+1]);
+                    swap(ColorArray[u][v],ColorArray[u-1][v+1]);
+
+                    swap(MainArray[u][v+2],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v+2],ColorArray[u+1][v+1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 3)
+                {
+                    swap(MainArray[u][v],MainArray[u][v+2]);
+                    swap(ColorArray[u][v],ColorArray[u][v+2]);
+
+                    swap(MainArray[u][v+1],MainArray[u+1][v+2]);
+                    swap(ColorArray[u][v+1],ColorArray[u+1][v+2]);
+
+                    swap(MainArray[u+2][v+1],MainArray[u+1][v]);
+                    swap(ColorArray[u+2][v+1],ColorArray[u+1][v]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 4)
+                {
+                    swap(MainArray[u+1][v-2],MainArray[u][v-1]);
+                    swap(ColorArray[u+1][v-2],ColorArray[u][v-1]);
+
+                    swap(MainArray[u+1][v],MainArray[u+2][v-1]);
+                    swap(ColorArray[u+1][v],ColorArray[u+2][v-1]);
+
+                    swap(MainArray[u][v],MainArray[u+2][v]);
+                    swap(ColorArray[u][v],ColorArray[u+2][v]);
+
+                    Rotation = 1;
+
+                    break;
+                }
+            }
+
+            /// J
+            case 6:
+            {
+                if(Rotation == 1)
+                {
+
+                    swap(MainArray[u+2][v-1],MainArray[u][v-1]);
+                    swap(ColorArray[u+2][v-1],ColorArray[u][v-1]);
+
+                    swap(MainArray[u+2][v],MainArray[u+1][v-1]);
+                    swap(ColorArray[u+2][v],ColorArray[u+1][v-1]);
+
+                    swap(MainArray[u][v],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v],ColorArray[u+1][v+1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 2)
+                {
+                    swap(MainArray[u][v],MainArray[u][v+2]);
+                    swap(ColorArray[u][v],ColorArray[u][v+2]);
+
+                    swap(MainArray[u+1][v],MainArray[u][v+1]);
+                    swap(ColorArray[u+1][v],ColorArray[u][v+1]);
+
+                    swap(MainArray[u+1][v+2],MainArray[u+2][v+1]);
+                    swap(ColorArray[u+1][v+2],ColorArray[u+2][v+1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 3)
+                {
+                    swap(MainArray[u+2][v],MainArray[u+1][v-1]);
+                    swap(ColorArray[u+2][v],ColorArray[u+1][v-1]);
+
+                    swap(MainArray[u][v],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v],ColorArray[u+1][v+1]);
+
+                    swap(MainArray[u][v+1],MainArray[u+2][v+1]);
+                    swap(ColorArray[u][v+1],ColorArray[u+2][v+1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 4)
+                {
+                    swap(MainArray[u][v],MainArray[u-1][v+1]);
+                    swap(ColorArray[u][v],ColorArray[u-1][v+1]);
+
+                    swap(MainArray[u][v+2],MainArray[u+1][v+1]);
+                    swap(ColorArray[u][v+2],ColorArray[u+1][v+1]);
+
+                    swap(MainArray[u+1][v+2],MainArray[u+1][v]);
+                    swap(ColorArray[u+1][v+2],ColorArray[u+1][v]);
+
+                    Rotation = 1;
+
+                    break;
+                }
+            }
+
+            /// T
+            case 7:
+            {
+                if(Rotation == 1)
+                {
+                    swap(MainArray[u][v],MainArray[u+1][v+2]);
+                    swap(ColorArray[u][v],ColorArray[u+1][v+2]);
+
+                    swap(MainArray[u][v+1],MainArray[u+2][v+2]);
+                    swap(ColorArray[u][v+1],ColorArray[u+2][v+2]);
+
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 2)
+                {
+                    swap(MainArray[u][v],MainArray[u+2][v-2]);
+                    swap(ColorArray[u][v],ColorArray[u+2][v-2]);
+
+                    swap(MainArray[u+1][v],MainArray[u+2][v-1]);
+                    swap(ColorArray[u+1][v],ColorArray[u+2][v-1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 3)
+                {
+                    swap(MainArray[u+1][v],MainArray[u][v-1]);
+                    swap(ColorArray[u+1][v],ColorArray[u][v-1]);
+
+                    swap(MainArray[u+1][v+1],MainArray[u-1][v-1]);
+                    swap(ColorArray[u+1][v+1],ColorArray[u-1][v-1]);
+
+                    Rotation++;
+
+                    break;
+                }
+
+                if(Rotation == 4)
+                {
+                    swap(MainArray[u+1][v],MainArray[u][v+1]);
+                    swap(ColorArray[u+1][v],ColorArray[u][v+1]);
+
+                    swap(MainArray[u+2][v],MainArray[u][v+2]);
+                    swap(ColorArray[u+2][v],ColorArray[u][v+2]);
+
+                    Rotation = 1;
+
+                    break;
+                }
+            }
+        }
+        ClearProjection();
+        ClearActiveBlocksInProjectionArray();
+        FillProjectionArray();
+        PlaceDownInProjectionArray();
+        LightTheProjection();
+    }
+}
+
+bool IsFullRow(int row)
+{
+    for(int i=8;i<=22;i++) if(MainArray[row][i] == ' ') return false;
+
+    return true;
+}
+
+bool IsRowHasStaticBlocks(int row)
+{
+    for(int i=8;i<=22;i++) if(MainArray[row][i] == 'S') return true;
+
+    return false;
+}
+
+void SwapRows(int row1,int row2)
+{
+    for(int i=8;i<=22;i++)
+    {
+        swap(MainArray[row1][i],MainArray[row2][i]);
+        swap(ColorArray[row1][i],ColorArray[row2][i]);
+    }
+}
+
+void DestroyRow(int row)
+{
+    for(int i=8;i<=22;i++) MainArray[row][i] = ' ';
+
+    Score += 100;
+
+    SetScore(Score);
+}
+
+void ApplyGravity(int row)
+{
+    int r = row;
+
+    while(IsRowHasStaticBlocks(r-1))
+    {
+        SwapRows(r,r-1);
+        r--;
+    }
+}
+
+void DestroyRowsAndApplyGravity()
+{
+    int ct = 0;
+    int i = 14;
+
+    while(i >= 0)
+    {
+        if(IsFullRow(i))
+        {
+            DestroyRow(i);
+            ApplyGravity(i);
+
+            ct++;
+
+            i = 15;
+        }
+        i--;
+    }
+
+    if(ct == 1 or ct == 2 or ct == 3) DestroySound();
+    if(ct == 4) TetrisSound();
+}
+
+void SwapTetrominoes()
+{
+    if(!HoldTetromino and !IsTetrominoSwappedOnce)
+    {
+        ClearActiveBlocksInMainArray();
+
+        HoldTetromino = CurrentTetromino;
+        DrawTetrominoInHoldBox(HoldTetromino);
+
+        CurrentTetromino = NextTetromino;
+        NextTetromino = getrand(1,7);
+
+        ClearTetrominoInNextBox();
+
+        SpawnTetrominoOnTop(CurrentTetromino);
+        DrawTetrominoInNextBox(NextTetromino);
+
+        IsTetrominoSwappedOnce = true;
+    }
+    else if(!IsTetrominoSwappedOnce)
+    {
+        ClearActiveBlocksInMainArray();
+
+        ClearTetrominoInHoldBox();
+
+        swap(HoldTetromino,CurrentTetromino);
+
+        DrawTetrominoInHoldBox(HoldTetromino);
+
+        SpawnTetrominoOnTop(CurrentTetromino);
+
+        IsTetrominoSwappedOnce = true;
+    }
+}
+
+void PlayGame()
+{
+    ShowConsoleCursor(false);
+
+    srand(time(0));
+
+    FillColorArray();
+
+    FillProjectionArray();
+
+    while(!stopgame)
+    {
+        PrintMainArray();
+
+        //PrintProjectionArray();
+
+        //cout<<getFirstActiveBlockXCoordinate()<<endl;
+        //cout<<getFirstActiveBlockYCoordinate()<<endl;
+        //cout<<Rotation<<endl;
+        //cout<<Score<<endl;
+
+        ClearScreen();
+
+        if(falling)
+        {
+            if(fall_delay % Difficulty == 0) MoveDownInMainArray();
+            if(fall_delay < 100) fall_delay++;
+            else fall_delay = 0;
+        }
+
+        if(Score > 100 and Level == 1) {Difficulty = 15; Level++;}
+        if(Score > 1000 and Level == 2) {Difficulty = 10; Level++;}
+        if(Score > 5000 and Level == 3) {Difficulty = 5; Level++;}
+        if(Score > 10000 and Level == 4) Difficulty = 1;
+
+        if(!AreThereActiveBlocks()) DestroyRowsAndApplyGravity();
+
+        if(!AreThereActiveBlocks() and CurrentTetromino == 0 and NextTetromino == 0)
+        {
+            CurrentTetromino = getrand(1,7);
+            NextTetromino = getrand(1,7);
+
+            SpawnTetrominoOnTop(CurrentTetromino);
+            DrawTetrominoInNextBox(NextTetromino);
+        }
+
+        if(!AreThereActiveBlocks() and CurrentTetromino != 0 and NextTetromino != 0)
+        {
+            CurrentTetromino = NextTetromino;
+            NextTetromino = getrand(1,7);
+
+            ClearTetrominoInNextBox();
+
+            SpawnTetrominoOnTop(CurrentTetromino);
+            DrawTetrominoInNextBox(NextTetromino);
+        }
+
+        if(GetAsyncKeyState(VK_SPACE))
+        {
+            if(!IsSpacePressed)
+            {
+                IsSpacePressed = true;
+
+                PlaceDownInMainArray();
+
+                Score += 10;
+
+                SetScore(Score);
+            }
+        }
+        else if(IsSpacePressed) IsSpacePressed = false;
+
+        if(GetAsyncKeyState(VK_LEFT)) MoveLeftInMainArray();
+
+        if(GetAsyncKeyState(VK_RIGHT)) MoveRightInMainArray();
+
+        if(GetAsyncKeyState(VK_DOWN)) MoveDownInMainArray();
+
+        if(GetAsyncKeyState(VK_UP))
+        {
+            if(!IsUpPressed)
+            {
+                IsUpPressed = true;
+
+                RotateTetromino(CurrentTetromino);
+            }
+        }
+        else if(IsUpPressed) IsUpPressed = false;
+
+        if(GetAsyncKeyState(VK_SHIFT))
+        {
+            if(!IsShiftPressed)
+            {
+                IsShiftPressed = true;
+
+                SwapTetrominoes();
+            }
+        }
+        else if(IsShiftPressed) IsShiftPressed = false;
+
+        if(GetAsyncKeyState(VK_ESCAPE)) stopgame = true;
+    }
+}
+
+int main()
+{
+    PlayGame();
+
+    return 0;
+}
